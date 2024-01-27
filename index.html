@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Speech-to-Text Demo</title>
+
+</head>
+<body>
+<div id="transcriptionResult"></div>
+ 
+  <button onclick="startRecording()">Start Recording</button>
+  <button onclick="stopRecording()">Stop Recording</button>
+  <button onclick="previewRecording()">Preview Recording</button>
+  <button onclick="transcribeRecording()">Transcribe Recording</button>
+
+  <script>
+    let mediaRecorder;
+    let recordedChunks = [];
+
+    const startRecording = async () => {
+    try {
+      // Clear recordedChunks for a new recording
+      recordedChunks = [];
+
+      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(micStream);
+      mediaRecorder.ondataavailable = (event) => {
+        recordedChunks.push(event.data);
+      };
+      mediaRecorder.onstop = () => {
+        // Do nothing on stop for now
+      };
+      mediaRecorder.start();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+    const stopRecording = () => {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+      }
+    };
+
+    const previewRecording = () => {
+      if (recordedChunks.length > 0) {
+        const recordedBlob = new Blob(recordedChunks, { type: "audio/webm" });
+        const audioElement = new Audio(URL.createObjectURL(recordedBlob));
+        audioElement.controls = true;
+        document.body.appendChild(audioElement);
+        audioElement.play();
+      } else {
+        console.log("No recording available to preview.");
+      }
+    };
+
+    const transcribeRecording = async () => {
+      if (recordedChunks.length > 0) {
+        const recordedBlob = new Blob(recordedChunks, { type: "audio/webm" });
+
+        // Convert Blob to ArrayBuffer
+        const arrayBuffer = await new Response(recordedBlob).arrayBuffer();
+
+        // Make a POST request to the server for transcription
+        const response = await fetch("http://localhost:5000/transcribe", {
+          method: "POST",
+          body: arrayBuffer,
+        });
+
+        // Handle the response from the server
+        const result = await response.json();
+       
+        console.log("Transcription result:", result);
+
+        document.getElementById("transcriptionResult").textContent = result.text;
+
+    // Copy the transcription result to the clipboard
+    navigator.clipboard.writeText(result.text).then(function() {
+    console.log('Copying to clipboard was successful!');
+    }, function(err) {
+    console.error('Could not copy text: ', err);
+    });
+      } else {
+        console.log("No recording available to transcribe.");
+      }
+    };
+
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden" && mediaRecorder && mediaRecorder.state === "recording") {
+        stopRecording();
+      }
+    });
+
+  </script>
+</body>
+</html>
+
+
+
+ 
